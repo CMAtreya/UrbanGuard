@@ -338,12 +338,8 @@ function markerColor(eventType) {
 }
 
 function predictionToRisk(prediction) {
-  if (prediction >= 2) {
-    return { label: "High risk", color: "#ef4444" };
-  }
-
   if (prediction === 1) {
-    return { label: "Medium risk", color: "#f59e0b" };
+    return { label: "Risky road", color: "#ef4444" };
   }
 
   return { label: "Safe", color: "#22c55e" };
@@ -402,10 +398,13 @@ export default function MapView({ events, activeFilter, routeRequest, showPredic
           }
 
           try {
+            const timestamp = event.timestamp ? new Date(event.timestamp) : new Date();
             const params = new URLSearchParams({
               lat: String(event.lat),
               lng: String(event.lng),
               confidence: String(event.confidence),
+              hour: String(timestamp.getUTCHours()),
+              day: String(timestamp.getUTCDate()),
             });
             const response = await fetch(`http://127.0.0.1:8000/predict?${params.toString()}`);
 
