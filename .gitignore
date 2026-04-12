@@ -1,0 +1,17 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+
+# Training/model artifacts
+backend/road_data.csv
+backend/pothole_model.pkl
+
+# Node
+frontend-new/node_modules/
+frontend-new/dist/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
