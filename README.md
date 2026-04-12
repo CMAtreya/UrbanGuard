@@ -1,8 +1,74 @@
 # UrbanGuard
 
-UrbanGuard is a smart road-safety dashboard that combines a FastAPI backend, a React + Vite frontend, live event simulation, route-based vehicle movement, heatmaps, and ML-based risk prediction.
+UrbanGuard is an AI-powered smart street system for live road event monitoring, route-aware vehicle simulation, and pothole risk prediction.
 
-## Project Structure
+It combines a FastAPI backend, a React + Vite dashboard, Leaflet maps, and a lightweight ML pipeline to visualize and analyze road conditions in real time.
+
+## What This Prototype Does
+
+- Shows live pothole, crash, and speed breaker events on a map
+- Displays a heatmap of danger zones
+- Simulates a vehicle moving on the shortest road route between two points
+- Highlights potholes ahead of the vehicle with an on-map warning
+- Lets users toggle a predicted risk zones layer
+- Trains a simple ML model from exported event data
+- Exposes a prediction API for road-risk classification
+
+## Tech Stack
+
+- Frontend: React, Vite, React Leaflet, Framer Motion
+- Backend: FastAPI, Pydantic
+- ML: pandas, scikit-learn, joblib
+- Mapping: OpenStreetMap, OSRM, Nominatim
+
+## Project Flow
+
+Vehicle or device data enters the system, the backend stores it, the dashboard updates live, and the ML layer predicts road-risk zones from historical event patterns.
+
+## Local Setup
+
+### Backend
+
+```bash
+cd backend
+uvicorn main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend-new
+npm install
+npm run dev
+```
+
+## Data and Model Pipeline
+
+### 1. Export event data
+
+```bash
+cd backend
+python export_data.py
+```
+
+### 2. Train the model
+
+```bash
+cd backend
+python train_model.py
+```
+
+This creates `pothole_model.pkl`, which is used by the prediction API.
+
+### 3. Prediction endpoint
+
+```http
+GET /predict?lat=...&lng=...&confidence=...
+```
+
+Returns a class label for the location risk prediction.
+
+## Repository Structure
 
 ```text
 UrbanGuard/
@@ -16,101 +82,29 @@ UrbanGuard/
 		package.json
 ```
 
-## Features
+## Planned Hardware Deployment
 
-- Live pothole and crash event visualization
-- Heatmap overlay for danger zones
-- Route-based vehicle simulation on the shortest road path
-- Pothole-ahead warning on the vehicle marker
-- Predicted Risk Zones layer
-- FastAPI prediction endpoint powered by a trained model
+The long-term version of UrbanGuard is designed for a vehicle-mounted device that streams sensor data to the backend. The intended hardware path is:
 
-## Backend Setup
-
-Open a terminal in `backend` and run:
-
-```bash
-uvicorn main:app --reload
-```
-
-Backend endpoints:
-
-- `GET /api/events` - returns all events
-- `GET /events` - compatibility endpoint returning the raw list
-- `GET /predict?lat=...&lng=...&confidence=...` - returns the predicted class
-
-## Frontend Setup
-
-Open a terminal in `frontend-new` and run:
-
-```bash
-npm install
-npm run dev
-```
-
-The frontend uses:
-
-- React
-- Vite
-- React Leaflet
-- Leaflet heatmap layer
-- Framer Motion
-
-## Generate Dataset
-
-From the `backend` folder:
-
-```bash
-python fake_data.py
-python export_data.py
-```
-
-This saves the current events to `road_data.csv`.
-
-## Train Model
-
-From the `backend` folder:
-
-```bash
-python train_model.py
-```
-
-This creates `pothole_model.pkl`.
+- ESP32-S3 controller
+- MPU6050 vibration sensor
+- Neo-6M GPS module
+- ESP32-CAM for image capture
+- BLE gateway through a phone
 
 ## Git Workflow
-
-Typical day-to-day flow:
 
 ```bash
 git checkout main
 git pull
 git checkout -b feature/your-change
-# edit files
 git add .
 git commit -m "Describe your change"
 git push -u origin feature/your-change
 ```
 
-If you are pushing an existing local project to a new empty GitHub repo:
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/<username>/<repo>.git
-git push -u origin main
-```
-
-If GitHub already has an initial commit and push is rejected:
-
-```bash
-git pull origin main --allow-unrelated-histories --no-rebase
-git push -u origin main
-```
-
 ## Notes
 
-- Do not commit `backend/venv`, `frontend-new/node_modules`, or generated model/data files unless you explicitly want them tracked.
-- The current vehicle movement is route-based and uses OSRM for shortest-road routing.
-- Predicted Risk Zones can be toggled from the dashboard.
+- Generated artifacts such as `road_data.csv` and `pothole_model.pkl` are not meant to be edited manually.
+- The current implementation uses simulated live data for the dashboard and route movement.
+- The hardware deployment is the next phase of the project.
