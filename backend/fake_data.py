@@ -1,11 +1,19 @@
-import requests
 import random
 import time
+from math import sqrt
+import os
+import sys
 
-URL = "http://127.0.0.1:8000/api/event"
+import requests
 
-# Actual road intersections and street segments in Bangalore
-# These are real coordinates on major roads, not random zones
+API_BASE = os.environ.get("URBANGUARD_API_BASE", "http://127.0.0.1:8002").rstrip("/")
+URL = f"{API_BASE}/api/event"
+HEALTH_URL = f"{API_BASE}/api/events"
+MAX_STARTUP_RETRIES = int(os.environ.get("URBANGUARD_STARTUP_RETRIES", "30"))
+RETRY_DELAY_SECONDS = float(os.environ.get("URBANGUARD_RETRY_DELAY_SECONDS", "2"))
+
+# Actual road intersections and street segments in Bangalore.
+# These are real coordinates on major roads, not random zones.
 ROAD_INTERSECTIONS = [
     # MG Road & surrounding
     {"name": "MG Road - Brigade Road", "lat": 12.9352, "lng": 77.6012},
@@ -62,23 +70,93 @@ ROAD_INTERSECTIONS = [
     {"name": "ORR - Vijaynagar", "lat": 12.9834, "lng": 77.6178},
 ]
 
-while True:
-    # Pick a random road intersection
-    road = random.choice(ROAD_INTERSECTIONS)
-    
-    # Add small noise to exact intersection (±0.0005 degrees ≈ ±50 meters)
-    lat = road["lat"] + (random.random() - 0.5) * 0.001
-    lng = road["lng"] + (random.random() - 0.5) * 0.001
-    
-    data = {
-        "device_id": f"UG-{random.randint(1, 999):04d}",
-        "event_type": random.choice(["pothole", "crash", "speed_breaker"]),
-        "lat": round(lat, 6),
-        "lng": round(lng, 6),
-        "confidence": round(random.uniform(0.7, 0.99), 2)
+# Keep a few pothole-prone spots active so the frontend sees repeated live alerts.
+POTHOLE_HOTSPOTS = [
+    {"name": "MG Road pothole cluster", "lat": 12.9352, "lng": 77.6012},
+    {"name": "Koramangala pothole cluster", "lat": 12.9298, "lng": 77.6312},
+    {"name": "Electronic City pothole cluster", "lat": 12.8395, "lng": 77.6789},
+    {"name": "ORR pothole cluster", "lat": 12.9567, "lng": 77.7234},
+    {"name": "Silk Board pothole cluster", "lat": 12.8447, "lng": 77.5863},
+]
+
+
+def build_event_payload():
+    pothole_focus = random.random() < 0.78
+    source = random.choice(POTHOLE_HOTSPOTS if pothole_focus else ROAD_INTERSECTIONS)
+
+    # Keep potholes dense around a handful of road points so they appear as live hotspots.
+    lat_noise = (random.random() - 0.5) * (0.00035 if pothole_focus else 0.001)
+    lng_noise = (random.random() - 0.5) * (0.00035 if pothole_focus else 0.001)
+
+    event_type = "pothole" if pothole_focus else random.choice(["crash", "speed_breaker"])
+    confidence_floor = 0.86 if pothole_focus else 0.7
+
+    base_ax = random.uniform(0.8, 2.5)
+    base_ay = random.uniform(0.8, 2.5)
+    base_az = random.uniform(0.8, 2.5)
+    noise = random.uniform(0.1, 1.5)
+
+    if event_type == "pothole":
+        ax = base_ax + noise
+        ay = base_ay + noise
+        az = base_az + noise
+    elif event_type == "crash":
+        ax = base_ax + noise * 2
+        ay = base_ay + noise * 2
+        az = base_az + noise * 2
+    else:
+        ax = base_ax
+        ay = base_ay
+        az = base_az
+
+    magnitude = sqrt(ax * ax + ay * ay + az * az)
+
+    return {
+        "source": source,
+        "data": {
+            "device_id": f"UG-{random.randint(1, 999):04d}",
+            "event_type": event_type,
+            "lat": round(source["lat"] + lat_noise, 6),
+            "lng": round(source["lng"] + lng_noise, 6),
+            "confidence": round(random.uniform(confidence_floor, 0.99), 2),
+            "ax": round(ax, 2),
+            "ay": round(ay, 2),
+            "az": round(az, 2),
+            "magnitude": round(magnitude, 2),
+        },
     }
 
-    requests.post(URL, json=data)
-    print(f"Sent: {road['name']} - {data}")
+
+def wait_for_backend():
+    for attempt in range(1, MAX_STARTUP_RETRIES + 1):
+        try:
+            response = requests.get(HEALTH_URL, timeout=5)
+            response.raise_for_status()
+            return
+        except requests.RequestException:
+            if attempt == MAX_STARTUP_RETRIES:
+                print(
+                    f"Backend is unavailable at {API_BASE}. Start it with `uvicorn main:app --reload --port 8002` "
+                    f"or set URBANGUARD_API_BASE to the correct URL.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(1)
+
+            time.sleep(RETRY_DELAY_SECONDS)
+
+wait_for_backend()
+
+while True:
+    payload = build_event_payload()
+    data = payload["data"]
+    source = payload["source"]
+
+    try:
+        requests.post(URL, json=data, timeout=5)
+        print(f"Sent: {source['name']} - {data}")
+    except requests.RequestException as error:
+        print(f"Backend unavailable while sending event: {error}", file=sys.stderr)
+        wait_for_backend()
+        continue
 
     time.sleep(2)

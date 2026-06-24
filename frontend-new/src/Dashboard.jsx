@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { FaCarCrash, FaExclamationTriangle, FaFilter, FaFireAlt, FaRoad, FaSatelliteDish } from "react-icons/fa";
+import { createElement, useState } from "react";
+import { AnimatePresence, m } from "framer-motion";
+import { FaCarCrash, FaExclamationTriangle, FaFilter, FaFireAlt, FaRoad } from "react-icons/fa";
+
+const MotionAside = m.aside;
+const MotionDiv = m.div;
 
 const filters = [
   { key: "all", label: "All Events", icon: FaFilter },
@@ -9,11 +12,11 @@ const filters = [
   { key: "safe-roads", label: "Safe Roads", icon: FaRoad },
 ];
 
-function StatCard({ icon: Icon, label, value, tone }) {
+function StatCard({ icon, label, value, tone }) {
   return (
     <div className="stat-card">
       <div className={`stat-icon ${tone}`}>
-        <Icon />
+        {createElement(icon)}
       </div>
       <div>
         <p className="stat-label">{label}</p>
@@ -27,14 +30,14 @@ export default function Dashboard({
   stats,
   activeFilter,
   onFilterChange,
-  showPredictedRiskZones,
-  onTogglePredictedRiskZones,
   alertMessage,
+  latestPothole,
   onRouteSubmit,
+  isCollapsed,
+  onToggleCollapse,
 }) {
   const [startPoint, setStartPoint] = useState("MG Road, Bengaluru");
   const [endPoint, setEndPoint] = useState("Electronic City, Bengaluru");
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleRouteSubmit = (event) => {
     event.preventDefault();
@@ -46,27 +49,12 @@ export default function Dashboard({
     }
 
     onRouteSubmit(start, end);
-    setIsCollapsed(true);
   };
 
   return (
     <AnimatePresence mode="wait" initial={false}>
-      {isCollapsed ? (
-        <motion.button
-          key="dashboard-collapsed"
-          type="button"
-          className="dashboard-live-toggle"
-          onClick={() => setIsCollapsed(false)}
-          initial={{ x: -34, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -20, opacity: 0 }}
-          transition={{ duration: 0.28, ease: "easeOut" }}
-        >
-          <span className="live-dot" />
-          Live
-        </motion.button>
-      ) : (
-        <motion.aside
+      {!isCollapsed ? (
+        <MotionAside
           key="dashboard-expanded"
           className="dashboard-panel"
           initial={{ x: -34, opacity: 0 }}
@@ -86,7 +74,7 @@ export default function Dashboard({
             <button
               type="button"
               className="live-pill"
-              onClick={() => setIsCollapsed(true)}
+              onClick={onToggleCollapse}
             >
               <span className="live-dot" />
               Live
@@ -100,28 +88,36 @@ export default function Dashboard({
             <StatCard icon={FaRoad} label="Safe Points" value={stats.safeRoadPoints} tone="green" />
           </div>
 
+          <div className="live-detection-card">
+            <div className="live-detection-title">
+              <span className="live-dot" />
+              Live Pothole Detection
+            </div>
+            {latestPothole ? (
+              <p className="live-detection-body">
+                Detected near {Number(latestPothole.lat).toFixed(4)}, {Number(latestPothole.lng).toFixed(4)}
+                <br />
+                Confidence: {Number(latestPothole.confidence).toFixed(2)}
+              </p>
+            ) : (
+              <p className="live-detection-body">Waiting for live pothole data...</p>
+            )}
+          </div>
+
           <div className="filters-block">
             <p className="section-label">Filters</p>
             <div className="filter-row">
-              {filters.map(({ key, label, icon: Icon }) => (
+              {filters.map(({ key, label, icon }) => (
                 <button
                   key={key}
                   type="button"
                   className={`filter-chip ${activeFilter === key ? "active" : ""}`}
                   onClick={() => onFilterChange(key)}
                 >
-                  <Icon />
+                  {createElement(icon)}
                   <span>{label}</span>
                 </button>
               ))}
-              <button
-                type="button"
-                className={`filter-chip ${showPredictedRiskZones ? "active" : ""}`}
-                onClick={onTogglePredictedRiskZones}
-              >
-                <FaSatelliteDish />
-                <span>Predicted Risk Zones</span>
-              </button>
             </div>
           </div>
 
@@ -147,21 +143,21 @@ export default function Dashboard({
           </form>
 
           {alertMessage ? (
-            <motion.div
+            <MotionDiv
               className="alert-banner"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
             >
               {alertMessage}
-            </motion.div>
+            </MotionDiv>
           ) : null}
 
           <p className="dashboard-note">
             Heatmap highlights potholes and crashes. “Safe Roads” currently shows lower-risk speed breaker points.
           </p>
-        </motion.aside>
-      )}
+        </MotionAside>
+      ) : null}
     </AnimatePresence>
   );
 }

@@ -6,17 +6,33 @@ import joblib
 # Load data
 df = pd.read_csv("road_data.csv")
 
-# Convert and extract time-based features
+feature_columns = ["lat", "lng", "confidence", "hour", "day"]
+required_columns = ["lat", "lng", "confidence", "timestamp", "event_type"]
+
+missing_columns = [column for column in required_columns if column not in df.columns]
+if missing_columns:
+	raise ValueError(
+		"road_data.csv is missing required columns for road-risk training: "
+		+ ", ".join(missing_columns)
+		+ ". Regenerate the dataset after exporting sensor-based events."
+	)
+
+# Convert and clean the training set
 df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-df = df.dropna(subset=["timestamp", "lat", "lng", "confidence", "event_type"])
+
+for column in ["lat", "lng", "confidence"]:
+	df[column] = pd.to_numeric(df[column], errors="coerce")
+
 df["hour"] = df["timestamp"].dt.hour
 df["day"] = df["timestamp"].dt.day
 
+df = df.dropna(subset=required_columns)
+
 # Binary risk target
-df["risk"] = df["event_type"].apply(lambda value: 1 if value == "pothole" else 0)
+df["risk"] = df["event_type"].apply(lambda value: 1 if value in {"pothole", "crash"} else 0)
 
 # Features
-X = df[["lat", "lng", "confidence", "hour", "day"]]
+X = df[feature_columns]
 y = df["risk"]
 
 # Train-test split
@@ -27,6 +43,6 @@ model = RandomForestClassifier(random_state=42)
 model.fit(X_train, y_train)
 
 # Save model
-joblib.dump(model, "pothole_model.pkl")
+joblib.dump(model, "road_risk_model.pkl")
 
-print("Model trained 🚀")
+print("Road-risk model trained 🚀")

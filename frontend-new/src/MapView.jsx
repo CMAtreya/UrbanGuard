@@ -4,6 +4,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8002";
+const MAX_VISIBLE_EVENTS = 500;
+const MAX_PREDICTION_POINTS = 120;
+
 const vehicleIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
   iconSize: [30, 30],
@@ -72,21 +76,20 @@ function parseLatLng(text) {
 }
 
 async function geocodeLocation(query) {
-  const encoded = encodeURIComponent(query);
   const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encoded}`
+    `${API_BASE}/api/geocode?query=${encodeURIComponent(query)}`
   );
 
   if (!response.ok) {
     throw new Error(`Failed to geocode: ${query}`);
   }
 
-  const results = await response.json();
-  if (!Array.isArray(results) || results.length === 0) {
+  const result = await response.json();
+  if (typeof result?.lat !== "number" || typeof result?.lng !== "number") {
     throw new Error(`Location not found: ${query}`);
   }
 
-  return [Number(results[0].lat), Number(results[0].lon)];
+  return [Number(result.lat), Number(result.lng)];
 }
 
 async function resolvePoint(input) {
@@ -190,7 +193,10 @@ function LiveVehicle({ events, routeRequest }) {
     return () => window.clearInterval(interval);
   }, [routePath]);
 
-  const position = routePath[Math.min(vehicleIndex, routePath.length - 1)] ?? [12.9716, 77.5946];
+  const position = useMemo(
+    () => routePath[Math.min(vehicleIndex, routePath.length - 1)] ?? [12.9716, 77.5946],
+    [routePath, vehicleIndex]
+  );
   const traveledPath = routePath.slice(0, Math.min(vehicleIndex + 1, routePath.length));
 
   useEffect(() => {
@@ -242,7 +248,7 @@ function LiveVehicle({ events, routeRequest }) {
     return { nearestIndex, nearestDistance };
   };
 
-  const potholeAheadMessage = useMemo(() => {
+  const potholeAheadMessage = (() => {
     if (routePath.length < 2 || potholeEvents.length === 0) {
       return "";
     }
@@ -271,13 +277,7 @@ function LiveVehicle({ events, routeRequest }) {
     }
 
     return "";
-  }, [potholeEvents, position, routePath, vehicleIndex]);
-
-  useEffect(() => {
-    if (potholeAheadMessage) {
-      console.log("⚠️", potholeAheadMessage);
-    }
-  }, [potholeAheadMessage]);
+  })();
 
   return (
     <>
@@ -345,12 +345,20 @@ function predictionToRisk(prediction) {
   return { label: "Safe", color: "#22c55e" };
 }
 
-export default function MapView({ events, activeFilter, routeRequest, showPredictedRiskZones }) {
+export default function MapView({
+  events,
+  activeFilter,
+  routeRequest,
+  latestPothole,
+  showPredictedRiskZones,
+  isDashboardCollapsed,
+  onToggleDashboard,
+}) {
   const [predictedRiskZones, setPredictedRiskZones] = useState([]);
   const predictionCacheRef = useRef(new Map());
 
   const visibleEvents = useMemo(
-    () => events.filter((event) => matchesFilter(event, activeFilter)),
+    () => events.slice(-MAX_VISIBLE_EVENTS).filter((event) => matchesFilter(event, activeFilter)),
     [activeFilter, events]
   );
 
@@ -366,27 +374,57 @@ export default function MapView({ events, activeFilter, routeRequest, showPredic
     [events]
   );
 
-  useEffect(() => {
-    if (!showPredictedRiskZones) {
-      setPredictedRiskZones([]);
-      return;
+  const predictionCandidates = useMemo(() => {
+    const seen = new Set();
+    const candidates = [];
+
+    for (let i = events.length - 1; i >= 0; i -= 1) {
+      const event = events[i];
+      const lat = Number(event.lat);
+      const lng = Number(event.lng);
+      const magnitude = Number(event.magnitude);
+
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        !Number.isFinite(Number(event.ax)) ||
+        !Number.isFinite(Number(event.ay)) ||
+        !Number.isFinite(Number(event.az)) ||
+        !Number.isFinite(magnitude)
+      ) {
+        continue;
+      }
+
+      const latBucket = lat.toFixed(4);
+      const lngBucket = lng.toFixed(4);
+      const dedupeKey = `${latBucket}:${lngBucket}`;
+
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+
+      seen.add(dedupeKey);
+      candidates.push(event);
+
+      if (candidates.length >= MAX_PREDICTION_POINTS) {
+        break;
+      }
     }
 
-    if (events.length === 0) {
-      setPredictedRiskZones([]);
+    return candidates;
+  }, [events]);
+
+  useEffect(() => {
+    if (!showPredictedRiskZones || predictionCandidates.length === 0) {
       return;
     }
 
     let cancelled = false;
 
     const runPredictionLayer = async () => {
-      const sourceEvents = events
-        .filter((event) => Number.isFinite(Number(event.lat)) && Number.isFinite(Number(event.lng)))
-        .slice(0, 300);
-
       const zones = await Promise.all(
-        sourceEvents.map(async (event) => {
-          const key = `${event.lat},${event.lng},${event.confidence}`;
+        predictionCandidates.map(async (event) => {
+          const key = `${Number(event.lat).toFixed(4)},${Number(event.lng).toFixed(4)},${Number(event.confidence).toFixed(2)}`;
           const cached = predictionCacheRef.current.get(key);
 
           if (cached) {
@@ -406,7 +444,7 @@ export default function MapView({ events, activeFilter, routeRequest, showPredic
               hour: String(timestamp.getUTCHours()),
               day: String(timestamp.getUTCDate()),
             });
-            const response = await fetch(`http://127.0.0.1:8000/predict?${params.toString()}`);
+            const response = await fetch(`${API_BASE}/predict-road-risk?${params.toString()}`);
 
             if (!response.ok) {
               return null;
@@ -421,7 +459,7 @@ export default function MapView({ events, activeFilter, routeRequest, showPredic
               lng: Number(event.lng),
               ...risk,
             };
-          } catch (error) {
+          } catch {
             return null;
           }
         })
@@ -437,21 +475,54 @@ export default function MapView({ events, activeFilter, routeRequest, showPredic
     return () => {
       cancelled = true;
     };
-  }, [events, showPredictedRiskZones]);
+  }, [predictionCandidates, showPredictedRiskZones]);
 
   return (
     <div className="map-stage">
+      <button
+        type="button"
+        className={`map-live-toggle ${isDashboardCollapsed ? "collapsed" : "expanded"}`}
+        onClick={onToggleDashboard}
+      >
+        <span className="live-dot" />
+        Live
+      </button>
       <MapContainer
         center={[12.2958, 76.6394]}
         zoom={13}
         scrollWheelZoom
+        preferCanvas
+        zoomAnimation={false}
+        markerZoomAnimation={false}
+        fadeAnimation={false}
         className="urban-map"
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          updateWhenIdle={false}
+          keepBuffer={2}
+        />
         <HeatOverlay points={heatPoints} />
         <LiveVehicle events={events} routeRequest={routeRequest} />
 
-        {showPredictedRiskZones
+        {latestPothole ? (
+          <CircleMarker
+            center={[Number(latestPothole.lat), Number(latestPothole.lng)]}
+            radius={12}
+            pathOptions={{
+              color: "#ef4444",
+              fillColor: "#ef4444",
+              fillOpacity: 0.25,
+              weight: 3,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -18]} permanent opacity={0.95} className="vehicle-warning-tooltip">
+              Live pothole detected
+            </Tooltip>
+          </CircleMarker>
+        ) : null}
+
+        {showPredictedRiskZones && events.length > 0
           ? predictedRiskZones.map((zone, index) => (
             <CircleMarker
               key={`risk-${zone.lat}-${zone.lng}-${index}`}
