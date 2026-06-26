@@ -196,6 +196,15 @@ function App() {
             return;
           }
 
+          if (message.type === "event_deleted") {
+            setEvents((cur) => cur.filter((e) => e.id !== message.id && String(e.id) !== String(message.id)));
+            const loc = userLocationRef.current;
+            if (loc) {
+              fetchNearbyEvents(loc.lat, loc.lng);
+            }
+            return;
+          }
+
           if (message.type === "event_added" && message.event) {
             const event = message.event;
             const loc = userLocationRef.current;

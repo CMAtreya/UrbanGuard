@@ -9,6 +9,7 @@ import {
   TileLayer,
   Tooltip,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -144,6 +145,15 @@ HTMLCanvasElement.prototype.getContext = function (contextType, options = {}) {
   if (contextType === "2d") options = { ...options, willReadFrequently: true };
   return originalGetContext.call(this, contextType, options);
 };
+
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({
+    click: (e) => {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
@@ -396,6 +406,17 @@ export default function MapView({
   const [agentSummary, setAgentSummary] = useState({});
   const predictionCacheRef = useRef(new Map());
   const centeredRef = useRef(false);
+  const [reportingLocation, setReportingLocation] = useState(null);
+
+  const handleResolveEvent = async (eventId) => {
+    try {
+      await fetch(`${API_BASE}/api/events/${eventId}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.error("Failed to delete event:", err);
+    }
+  };
 
   // Road health and risk grids
   const [showHealthGrid, setShowHealthGrid] = useState(false);
@@ -676,6 +697,72 @@ export default function MapView({
         fadeAnimation={false}
         className="urban-map"
       >
+        <MapClickHandler onMapClick={(lat, lng) => setReportingLocation({ lat, lng })} />
+
+        {reportingLocation && (
+          <Marker position={[reportingLocation.lat, reportingLocation.lng]}>
+            <Popup closeOnClick={false} onClose={() => setReportingLocation(null)}>
+              <div className="report-overlay-form">
+                <strong style={{ fontSize: "12px", display: "block", marginBottom: "8px", color: "var(--accent)" }}>
+                  📣 Report Incident
+                </strong>
+                <label style={{ fontSize: "10px", opacity: 0.8, display: "block", marginBottom: "2px" }}>Type</label>
+                <select id="report-type">
+                  <option value="pothole">Pothole</option>
+                  <option value="crash">Crash</option>
+                  <option value="speed_breaker">Speed Breaker</option>
+                </select>
+                
+                <label style={{ fontSize: "10px", opacity: 0.8, display: "block", marginBottom: "2px" }}>Severity</label>
+                <select id="report-severity">
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                </select>
+                
+                <label style={{ fontSize: "10px", opacity: 0.8, display: "block", marginBottom: "2px" }}>Confidence (0.1 - 1.0)</label>
+                <input type="number" id="report-confidence" min="0.1" max="1.0" step="0.1" defaultValue="0.9" />
+
+                <button 
+                  type="button" 
+                  className="submit-btn"
+                  onClick={async () => {
+                    const type = document.getElementById("report-type").value;
+                    const severity = document.getElementById("report-severity").value;
+                    const confidence = parseFloat(document.getElementById("report-confidence").value) || 0.9;
+                    
+                    try {
+                      const res = await fetch(`${API_BASE}/api/event`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          lat: reportingLocation.lat,
+                          lng: reportingLocation.lng,
+                          event_type: type,
+                          severity: severity,
+                          confidence: confidence,
+                          device_id: "web-client",
+                          magnitude: type === "pothole" ? 6.5 : 0.0,
+                          ax: 0, ay: 0, az: 9.8
+                        })
+                      });
+                      if (res.ok) {
+                        setReportingLocation(null);
+                      }
+                    } catch (err) {
+                      console.error("Failed to submit event:", err);
+                    }
+                  }}
+                >
+                  Submit Report
+                </button>
+                <button type="button" className="cancel-btn" onClick={() => setReportingLocation(null)}>
+                  Cancel
+                </button>
+              </div>
+            </Popup>
+          </Marker>
+        )}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           updateWhenIdle={false}
@@ -917,6 +1004,15 @@ export default function MapView({
                       <div style={{ height: "10px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", width: "100%" }} />
                       <div style={{ height: "10px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", width: "60%" }} />
                     </div>
+                  )}
+                  {event.id && (
+                    <button 
+                      type="button" 
+                      className="resolve-btn"
+                      onClick={() => handleResolveEvent(event.id)}
+                    >
+                      Resolve Incident
+                    </button>
                   )}
                 </div>
               </Popup>

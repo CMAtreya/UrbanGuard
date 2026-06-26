@@ -1,7 +1,21 @@
 import { useState } from "react";
-import { FaRoute, FaShieldAlt, FaBolt, FaRoad, FaStar, FaHistory, FaSpinner } from "react-icons/fa";
+import { motion } from "framer-motion";
+import { FaRoute, FaShieldAlt, FaBolt, FaRoad, FaStar, FaHistory, FaSpinner, FaTrash } from "react-icons/fa";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8002";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0 }
+};
 
 const ROUTE_COLORS = {
   safest: "#22c55e",
@@ -160,6 +174,19 @@ export default function RouteAnalyzer({ onRoutesAnalyzed, onRouteSelected, analy
     } catch { /* ignore */ }
   };
 
+  const handleDeleteLog = async (logId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/route-logs/${logId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchHistory();
+      }
+    } catch (err) {
+      console.error("Failed to delete route log:", err);
+    }
+  };
+
   const handleSelect = (idx) => {
     setSelectedIndex(idx);
     onRouteSelected(idx);
@@ -241,20 +268,25 @@ export default function RouteAnalyzer({ onRoutesAnalyzed, onRouteSelected, analy
 
           {/* Results */}
           {routes.length > 0 && (
-            <div>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+            >
               <div style={{ fontSize: "10px", opacity: 0.5, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                 {routes.length} routes found — {analyzedRoutes?.source} → {analyzedRoutes?.destination}
               </div>
               {routes.map((route, i) => (
-                <RouteCard
-                  key={`${route.type}-${i}`}
-                  route={route}
-                  index={i}
-                  isSelected={i === selectedIndex}
-                  onSelect={handleSelect}
-                />
+                <motion.div key={`${route.type}-${i}`} variants={itemVariants}>
+                  <RouteCard
+                    route={route}
+                    index={i}
+                    isSelected={i === selectedIndex}
+                    onSelect={handleSelect}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
 
           {/* Loading skeleton */}
@@ -274,35 +306,43 @@ export default function RouteAnalyzer({ onRoutesAnalyzed, onRouteSelected, analy
         </>
       ) : (
         /* History panel */
-        <div>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+        >
           {history.length === 0 ? (
             <p style={{ fontSize: "11px", opacity: 0.45 }}>No route history yet.</p>
           ) : (
             history.map((log) => (
-              <div
+              <motion.div
                 key={log.id}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: "8px",
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.04)",
-                  marginBottom: "6px",
-                  fontSize: "11px",
-                }}
+                variants={itemVariants}
+                className="history-item"
               >
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 600 }}>{log.source} → {log.destination}</span>
-                  <span style={{ opacity: 0.5 }}>{new Date(log.timestamp).toLocaleDateString()}</span>
+                <div className="history-info">
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontWeight: 600 }}>{log.source} → {log.destination}</span>
+                    <span style={{ opacity: 0.5 }}>{new Date(log.timestamp).toLocaleDateString()}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px", marginTop: "4px", opacity: 0.65 }}>
+                    {log.safest_score != null && <span>Safety: {log.safest_score}</span>}
+                    {log.safest_distance_km != null && <span>{log.safest_distance_km} km</span>}
+                    {log.potholes_avoided > 0 && <span style={{ color: "#22c55e" }}>+{log.potholes_avoided} avoided</span>}
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: "10px", marginTop: "4px", opacity: 0.65 }}>
-                  {log.safest_score != null && <span>Safety: {log.safest_score}</span>}
-                  {log.safest_distance_km != null && <span>{log.safest_distance_km} km</span>}
-                  {log.potholes_avoided > 0 && <span style={{ color: "#22c55e" }}>+{log.potholes_avoided} avoided</span>}
-                </div>
-              </div>
+                <button
+                  type="button"
+                  className="history-delete-btn"
+                  onClick={() => handleDeleteLog(log.id)}
+                  title="Delete log"
+                >
+                  <FaTrash />
+                </button>
+              </motion.div>
             ))
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );

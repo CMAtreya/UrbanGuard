@@ -78,10 +78,15 @@ async def add_events_bulk(event: EventCreate):
     return await add_event(event)
 
 @router.delete("/api/events/{id}")
-def delete_event(id: str):
+async def delete_event(id: str):
     success = supabase_service.delete_event(id)
     if not success:
         raise HTTPException(status_code=404, detail=f"Event with id {id} not found")
+    
+    await socket_manager.broadcast({
+        "type": "event_deleted",
+        "id": id,
+    })
     return {"message": "Event deleted successfully"}
 
 @router.get("/api/geocode")
