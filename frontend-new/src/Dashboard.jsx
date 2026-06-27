@@ -1,4 +1,5 @@
 import { createElement, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaCarCrash, FaExclamationTriangle, FaFilter, FaFireAlt, FaRoad, FaInfoCircle, FaLocationArrow, FaMapMarkerAlt, FaFilePdf, FaBrain, FaCompass, FaChartPie, FaSpinner, FaTrash } from "react-icons/fa";
 import MLStatsCard from "./MLStatsCard.jsx";
@@ -223,14 +224,31 @@ export default function Dashboard({
                 </p>
               </div>
 
-              <button
-                type="button"
-                className="live-pill"
-                onClick={onToggleCollapse}
-              >
-                <span className="live-dot" />
-                Live
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+                <button
+                  type="button"
+                  className="live-pill"
+                  onClick={onToggleCollapse}
+                >
+                  <span className="live-dot" />
+                  Live
+                </button>
+                <Link
+                  to="/report"
+                  className="live-pill"
+                  style={{
+                    background: "rgba(56, 189, 248, 0.12)",
+                    color: "#38bdf8",
+                    border: "1px solid rgba(56, 189, 248, 0.28)",
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                >
+                  📄 Report
+                </Link>
+              </div>
             </div>
             
             {/* Tab Navigation */}
@@ -472,6 +490,7 @@ export default function Dashboard({
                     analyzedRoutes={analyzedRoutes}
                     onRoutesAnalyzed={onRoutesAnalyzed}
                     onRouteSelected={onRouteSelected}
+                    onRouteSubmit={onRouteSubmit}
                   />
 
                   <div style={{ marginTop: "16px" }}>

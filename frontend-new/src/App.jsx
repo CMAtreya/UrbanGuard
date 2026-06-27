@@ -59,6 +59,8 @@ function App() {
   // Route analysis state
   const [analyzedRoutes, setAnalyzedRoutes] = useState(null);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+  const [routingSource, setRoutingSource] = useState("");
+  const [routingDestination, setRoutingDestination] = useState("");
 
   const potholeKeysRef = useRef(new Set());
   const alertTimeoutRef = useRef(null);
@@ -294,7 +296,32 @@ function App() {
     };
   }, [events]);
 
+  // Auto-re-analyze route in real-time when anomalies list changes
+  useEffect(() => {
+    if (!routingSource || !routingDestination) return;
+
+    const delayDebounceFn = setTimeout(() => {
+      const reAnalyze = async () => {
+        try {
+          const res = await axios.post(`${API_BASE}/api/routes/analyze`, {
+            source: routingSource,
+            destination: routingDestination,
+            save_log: false,
+          });
+          setAnalyzedRoutes(res.data);
+        } catch (err) {
+          console.error("Failed to auto-update route:", err);
+        }
+      };
+      reAnalyze();
+    }, 600);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [events, routingSource, routingDestination]);
+
   const handleRouteSubmit = (start, end) => {
+    setRoutingSource(start);
+    setRoutingDestination(end);
     setRouteRequest({ start, end, requestId: Date.now() });
     setIsDashboardCollapsed(true);
   };

@@ -17,6 +17,7 @@ _log_id_counter = 0
 class RouteAnalyzeRequest(BaseModel):
     source: str
     destination: str
+    save_log: bool | None = True
 
 
 # ── Analyze routes ────────────────────────────────────────────────────────────
@@ -39,23 +40,24 @@ def post_analyze_routes(body: RouteAnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Route analysis failed: {e}")
 
-    # Auto-save to route log
-    _log_id_counter += 1
-    safest = next((r for r in result.get("routes", []) if r.get("type") == "safest"), None)
-    log_entry = {
-        "id": _log_id_counter,
-        "source": body.source.strip(),
-        "destination": body.destination.strip(),
-        "timestamp": datetime.utcnow().isoformat(),
-        "total_routes": result.get("total_routes", 0),
-        "safest_score": safest["safety_score"] if safest else None,
-        "safest_distance_km": safest["distance_km"] if safest else None,
-        "potholes_avoided": safest["potholes_avoided"] if safest else 0,
-    }
-    _route_logs.append(log_entry)
-    # Keep only last 50
-    if len(_route_logs) > 50:
-        _route_logs.pop(0)
+    # Auto-save to route log only if requested
+    if body.save_log:
+        _log_id_counter += 1
+        safest = next((r for r in result.get("routes", []) if r.get("type") == "safest"), None)
+        log_entry = {
+            "id": _log_id_counter,
+            "source": body.source.strip(),
+            "destination": body.destination.strip(),
+            "timestamp": datetime.utcnow().isoformat(),
+            "total_routes": result.get("total_routes", 0),
+            "safest_score": safest["safety_score"] if safest else None,
+            "safest_distance_km": safest["distance_km"] if safest else None,
+            "potholes_avoided": safest["potholes_avoided"] if safest else 0,
+        }
+        _route_logs.append(log_entry)
+        # Keep only last 50
+        if len(_route_logs) > 50:
+            _route_logs.pop(0)
 
     return result
 

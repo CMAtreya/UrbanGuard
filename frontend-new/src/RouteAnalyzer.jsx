@@ -127,7 +127,7 @@ function RouteCard({ route, index, isSelected, onSelect }) {
   );
 }
 
-export default function RouteAnalyzer({ onRoutesAnalyzed, onRouteSelected, analyzedRoutes }) {
+export default function RouteAnalyzer({ onRoutesAnalyzed, onRouteSelected, analyzedRoutes, onRouteSubmit }) {
   const [source, setSource] = useState("MG Road, Bengaluru");
   const [destination, setDestination] = useState("Electronic City, Bengaluru");
   const [loading, setLoading] = useState(false);
@@ -155,6 +155,9 @@ export default function RouteAnalyzer({ onRoutesAnalyzed, onRouteSelected, analy
 
       const data = await res.json();
       onRoutesAnalyzed(data);
+      if (onRouteSubmit) {
+        onRouteSubmit(source.trim(), destination.trim());
+      }
       setSelectedIndex(0);
       if (data.routes?.length > 0) {
         onRouteSelected(0);
