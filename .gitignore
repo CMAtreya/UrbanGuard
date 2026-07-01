@@ -1,7 +1,7 @@
 # Python
 backend/venv/
-backend/__pycache__/
-backend/*.pyc
+**/__pycache__/
+**/*.pyc
 
 # Training/model artifacts
 backend/road_data.csv
@@ -15,3 +15,4 @@ frontend-new/dist/
 .DS_Store
 Thumbs.db
 .vscode/
+.ipynb_checkpoints/

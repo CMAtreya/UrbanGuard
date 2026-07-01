@@ -1,0 +1,44 @@
+{
+  "model": "pothole_vibration_model",
+  "accuracy": 1.0,
+  "cv_mean": 0.86,
+  "cv_std": 0.1158,
+  "feature_importances": {
+    "ax": 0.24877843245190184,
+    "ay": 0.1567871572581149,
+    "az": 0.09302160424609406,
+    "magnitude": 0.17305687509769144,
+    "jerk": 0.16103873450812228,
+    "intensity": 0.16731719643807558
+  },
+  "classification_report": {
+    "0": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 1.0
+    },
+    "1": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 4.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 5.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 5.0
+    }
+  },
+  "trained_at": "2026-06-24T14:57:34.997893",
+  "training_samples": 16,
+  "test_samples": 5
+}

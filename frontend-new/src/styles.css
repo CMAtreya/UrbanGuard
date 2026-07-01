@@ -68,6 +68,7 @@ body {
 .dashboard-panel {
   position: absolute;
   top: 20px;
+  bottom: 20px;
   left: 20px;
   z-index: 1000;
   width: min(380px, calc(100vw - 40px));
@@ -80,6 +81,23 @@ body {
   will-change: transform;
   isolation: isolate;
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.dashboard-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.dashboard-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dashboard-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 99px;
+}
+.dashboard-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.30);
 }
 
 .dashboard-live-toggle {
